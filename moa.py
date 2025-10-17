@@ -105,4 +105,7 @@ with gr.Blocks(css="""
     btn = gr.Button("🚀 Run Mixture-of-Agents")
     btn.click(run_moa, inputs=prompt, outputs=[indiv_box, merged_box])
 
-iface.launch(share=True)
+# iface.launch(share=True)
+
+if __name__ == "__main__":
+    iface.launch(server_name="0.0.0.0", server_port=7860)
