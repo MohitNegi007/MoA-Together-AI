@@ -5,3 +5,4 @@ datasets
 typer
 rich
 gradio
+Together
