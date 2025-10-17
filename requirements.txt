@@ -4,3 +4,5 @@ loguru
 datasets
 typer
 rich
+together
+gradio
