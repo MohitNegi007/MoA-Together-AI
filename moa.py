@@ -1,9 +1,7 @@
-# Mixture-of-Agents + Gradio (visible, responsive outputs)
 import asyncio
 import os
 from together import AsyncTogether, Together
 import gradio as gr
-
 
 # Initialize clients
 client = Together(api_key=os.environ.get("TOGETHER_API_KEY"))
@@ -11,22 +9,14 @@ async_client = AsyncTogether(api_key=os.environ.get("TOGETHER_API_KEY"))
 
 # Models
 reference_models = [
-    "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",   # 🦙 Excellent general reasoning, coherent text
-    "deepseek-ai/DeepSeek-R1-0528",                    # 🧩 Strong reasoning, concise & factual
-    "openai/gpt-oss-20b",                              # 💬 Polished, fluent English phrasing
-    "qwen/Qwen2.5-72B-Instruct-Turbo",                 # 🧠 Great for structured, logical answers
-    "moonshotai/Kimi-K2-Instruct-0905"                 # 🧮 Creative + multilingual coverage
+    "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
+    "deepseek-ai/DeepSeek-R1-0528",
+    "openai/gpt-oss-20b",
+    "qwen/Qwen2.5-72B-Instruct-Turbo",
+    "moonshotai/Kimi-K2-Instruct-0905"
 ]
 
-
 aggregator_model = "Qwen/Qwen2.5-72B-Instruct-Turbo"
-
-aggregator_system_prompt = """You are an expert AI tasked with combining and improving multiple model responses.
-Carefully analyze all responses, highlight the best ideas, remove inaccuracies and logical fallacies, and produce a final, polished answer.
-Make it concise, accurate and coherent.
-
-Responses from models:
-"""
 
 # Run one model
 async def run_llm(model, user_prompt):
@@ -44,13 +34,13 @@ async def run_llm(model, user_prompt):
             print(f"Error in {model}: {e}")
     return f"{model}: Failed after retries."
 
-# MoA process
-async def moa_response(prompt):
+# MoA process (now accepts dynamic system prompt)
+async def moa_response(prompt, custom_system_prompt):
     results = await asyncio.gather(*[run_llm(model, prompt) for model in reference_models])
     model_outputs = {reference_models[i]: results[i] for i in range(len(reference_models))}
 
     combined_text = "\n".join([f"{i+1}. {output}" for i, output in enumerate(results)])
-    merged_prompt = aggregator_system_prompt + combined_text
+    merged_prompt = custom_system_prompt + "\n\nResponses from models:\n" + combined_text
 
     merged_response = client.chat.completions.create(
         model=aggregator_model,
@@ -62,8 +52,8 @@ async def moa_response(prompt):
 
     return model_outputs, merged_response.choices[0].message.content
 
-def run_moa(prompt):
-    model_outputs, merged = asyncio.run(moa_response(prompt))
+def run_moa(prompt, custom_system_prompt):
+    model_outputs, merged = asyncio.run(moa_response(prompt, custom_system_prompt))
     individual_text = ""
     for model, output in model_outputs.items():
         individual_text += f"🧠 {model}\n\n{output}\n\n{'='*50}\n\n"
@@ -80,7 +70,7 @@ with gr.Blocks(css="""
   background-color: #1e1e1e;
 }
 """) as iface:
-    gr.Markdown("## 🧠 Mixture-of-Agents (MoA) Visual Demo\nCombines outputs from multiple Together models into one refined answer.")
+    gr.Markdown("## 🧠 Mixture-of-Agents (MoA) Visual Demo\nCombine outputs from multiple Together models into one refined answer.")
 
     prompt = gr.Textbox(
         label="Enter your prompt",
@@ -88,9 +78,18 @@ with gr.Blocks(css="""
         placeholder="Ask anything...",
     )
 
+    aggregator_prompt_box = gr.Textbox(
+        label="🧩 Aggregator System Prompt",
+        lines=4,
+        value="""You are an expert AI tasked with combining and improving multiple model responses.
+Carefully analyze all responses, highlight the best ideas, remove inaccuracies and logical fallacies,
+and produce a final, polished answer. Make it concise, accurate and coherent.""",
+        placeholder="Customize the aggregation instructions here...",
+    )
+
     with gr.Row():
         indiv_box = gr.Textbox(
-            label="🧩 Individual Model Responses",
+            label="🧠 Individual Model Responses",
             value="Responses will appear here...",
             elem_id="indiv_box",
             lines=20,
@@ -103,7 +102,8 @@ with gr.Blocks(css="""
         )
 
     btn = gr.Button("🚀 Run Mixture-of-Agents")
-    btn.click(run_moa, inputs=prompt, outputs=[indiv_box, merged_box])
+    btn.click(run_moa, inputs=[prompt, aggregator_prompt_box], outputs=[indiv_box, merged_box])
+
 
 # iface.launch(share=True)
 
