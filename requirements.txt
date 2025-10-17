@@ -4,5 +4,4 @@ loguru
 datasets
 typer
 rich
-together-ai
 gradio
